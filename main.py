@@ -80,9 +80,14 @@ def main(_):
 
         if FLAGS.test:
             model.load(sess)
+            file_writer = tf.summary.FileWriter('data/logs', sess.graph)
+
             model.eval(sess, test, name='Test')
         else:
-            if FLAGS.load: model.load(sess)
+            if FLAGS.load:
+                model.load(sess)
+            file_writer = tf.summary.FileWriter('data/logs', sess.graph)
+            print("Model loaded. Training ...")
             model.train(sess, train, val)
 
 if __name__ == '__main__':

@@ -22,15 +22,16 @@ class DMN(BaseModel):
         answer = tf.placeholder('int32', shape=[N], name='y')  # [num_batch] - one word answer
         fact_counts = tf.placeholder('int64', shape=[N], name='fc')
         input_mask = tf.placeholder('float32', shape=[N, F, L, V], name='xm')
-        is_training = tf.placeholder(tf.bool)
+        is_training = tf.placeholder(tf.bool, name='is_training')
         self.att = tf.constant(0.)
 
         # Prepare parameters
-        gru = rnn_cell.GRUCell(d)
+        # gru = rnn_cell.GRUCell(d)
         l = self.positional_encoding()
         embedding = weight('embedding', [A, V], init='uniform', range=3**(1/2))
 
         with tf.name_scope('SentenceReader'):
+            print('Build step: SentenceReader')
             input_list = tf.unpack(tf.transpose(input))  # L x [F, N]
             input_embed = []
             for facts in input_list:
@@ -47,13 +48,14 @@ class DMN(BaseModel):
         facts = dropout(facts, params.keep_prob, is_training)
 
         with tf.name_scope('InputFusion'):
+            print('Build step: InputFusion')
             # Bidirectional RNN
             with tf.variable_scope('Forward'):
-                forward_states, _ = tf.nn.dynamic_rnn(gru, facts, fact_counts, dtype=tf.float32)
+                forward_states, _ = tf.nn.dynamic_rnn(rnn_cell.GRUCell(d), facts, fact_counts, dtype=tf.float32)
 
             with tf.variable_scope('Backward'):
                 facts_reverse = tf.reverse_sequence(facts, fact_counts, 1)
-                backward_states, _ = tf.nn.dynamic_rnn(gru, facts_reverse, fact_counts, dtype=tf.float32)
+                backward_states, _ = tf.nn.dynamic_rnn(rnn_cell.GRUCell(d), facts_reverse, fact_counts, dtype=tf.float32)
 
             # Use forward and backward states both
             facts = forward_states + backward_states  # [N, F, d]
@@ -61,7 +63,7 @@ class DMN(BaseModel):
         with tf.variable_scope('Question'):
             ques_list = tf.unpack(tf.transpose(question))
             ques_embed = [tf.nn.embedding_lookup(embedding, w) for w in ques_list]
-            _, question_vec = tf.nn.rnn(gru, ques_embed, dtype=tf.float32)
+            _, question_vec = tf.nn.rnn(rnn_cell.GRUCell(d), ques_embed, dtype=tf.float32)
 
         # Episodic Memory
         with tf.variable_scope('Episodic'):
@@ -71,7 +73,7 @@ class DMN(BaseModel):
             for t in range(params.memory_step):
                 with tf.variable_scope('Layer%d' % t) as scope:
                     if params.memory_update == 'gru':
-                        memory = gru(episode.new(memory), memory)[0]
+                        memory = rnn_cell.GRUCell(d)(episode.new(memory), memory)[0]
                     else:
                         # ReLU update
                         c = episode.new(memory)
@@ -94,11 +96,13 @@ class DMN(BaseModel):
         memory = dropout(memory, params.keep_prob, is_training)
 
         with tf.name_scope('Answer'):
+            print('Build step: Answer')
             # Answer module : feed-forward version (for it is one word answer)
             w_a = weight('w_a', [d, A], init='xavier')
             logits = tf.matmul(memory, w_a)  # [N, A]
 
         with tf.name_scope('Loss'):
+            print('Build step: Loss')
             # Cross-Entropy loss
             cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits, answer)
             loss = tf.reduce_mean(cross_entropy)
@@ -130,22 +134,27 @@ class DMN(BaseModel):
         self.opt_op = opt_op
 
     def positional_encoding(self):
-        D, M, N = self.params.embed_size, self.params.max_sent_size, self.params.batch_size
+        """Positional encoding of size embed_size x max_sent_size."""
+        D, M, = self.params.embed_size, self.params.max_sent_size
         encoding = np.zeros([M, D])
         for j in range(M):
             for d in range(D):
-                encoding[j, d] = (1 - float(j)/M) - (float(d)/D)*(1 - 2.0*j/M)
+                encoding[j, d] = \
+                    (1 - float(j) / M) - (float(d) / D) * (1 - 2.0 * j / M)
 
         return encoding
 
     def preprocess_batch(self, batches):
-        """ Make padding and masks last word of sentence. (EOS token)
+        """Make padding and masks last word of sentence. (EOS token)
         :param batches: A tuple (input, question, label, mask)
         :return A tuple (input, question, label, mask)
         """
         params = self.params
         input, question, label = batches
-        N, L, Q, F = params.batch_size, params.max_sent_size, params.max_ques_size, params.max_fact_count
+        N, L, Q, F = \
+            params.batch_size, params.max_sent_size, \
+            params.max_ques_size, params.max_fact_count
+
         V = params.embed_size
 
         # make input and question fixed size

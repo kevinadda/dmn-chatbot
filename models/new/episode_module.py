@@ -33,8 +33,8 @@ class EpisodeModule:
         state = self.init_state
         memory = tf.transpose(memory)  # [N, D]
 
-        with tf.variable_scope('AttnGate') as scope:
-            for f, f_t in zip(self.facts, self.facts_transposed):
+        for i, (f, f_t) in enumerate(zip(self.facts, self.facts_transposed)):
+            with tf.variable_scope('AttnGate_%i' % i) as scope:
                 g = self.attention(f, memory)
                 state = self.gru(f_t, state, g)
                 scope.reuse_variables()  # share params
