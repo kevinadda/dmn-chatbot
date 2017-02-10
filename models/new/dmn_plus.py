@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.ops import rnn_cell
@@ -22,7 +23,8 @@ class DMN(BaseModel):
         answer = tf.placeholder('int32', shape=[N], name='y')  # [num_batch] - one word answer
         fact_counts = tf.placeholder('int64', shape=[N], name='fc')
         input_mask = tf.placeholder('float32', shape=[N, F, L, V], name='xm')
-        is_training = tf.placeholder(tf.bool, name='is_training')
+        is_training = tf.placeholder(tf.bool, [], name='is_training')
+        # is_training = tf.Variable(True, name='is_training')
         self.att = tf.constant(0.)
 
         # Prepare parameters
@@ -116,9 +118,10 @@ class DMN(BaseModel):
             accuracy = tf.reduce_mean(tf.cast(corrects, tf.float32))
 
         # Training
+        t0 = time.time()
         optimizer = tf.train.AdamOptimizer(params.learning_rate)
         opt_op = optimizer.minimize(total_loss, global_step=self.global_step)
-
+        print("Optimizer initialized in %0.2f min" % ((time.time() - t0) / 60.))
         # placeholders
         self.x = input
         self.xm = input_mask

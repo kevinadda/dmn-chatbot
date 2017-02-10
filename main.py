@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+from time import time
 
 import tensorflow as tf
 
@@ -76,18 +77,21 @@ def main(_):
 
     with tf.Session() as sess:
         model = DMN(FLAGS, words)
-        sess.run(tf.initialize_all_variables())
-
+        t0 = time()
+        sess.run(tf.global_variables_initializer()) # , feed_dict={'is_training:0': True})
+        print("Variables intitialized in %0.2f min" % ((time() - t0) / 60)
         if FLAGS.test:
             model.load(sess)
-            file_writer = tf.summary.FileWriter('data/logs', sess.graph)
+            # file_writer = tf.summary.FileWriter('data/logs', sess.graph)
 
             model.eval(sess, test, name='Test')
         else:
             if FLAGS.load:
+                t0 = time()
                 model.load(sess)
+                print("Model loaded in %0.2f min" % ((time() - t0) / 60)
             file_writer = tf.summary.FileWriter('data/logs', sess.graph)
-            print("Model loaded. Training ...")
+            print("Training ...")
             model.train(sess, train, val)
 
 if __name__ == '__main__':
