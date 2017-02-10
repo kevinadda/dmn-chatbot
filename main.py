@@ -78,8 +78,9 @@ def main(_):
     with tf.Session() as sess:
         model = DMN(FLAGS, words)
         t0 = time()
-        sess.run(tf.global_variables_initializer()) # , feed_dict={'is_training:0': True})
-        print("Variables intitialized in %0.2f min" % ((time() - t0) / 60)
+        # sess.run(tf.global_variables_initializer()) , feed_dict={'is_training:0': True})
+        sess.run(tf.initialize_all_variables(), feed_dict={'DMN/is_training:0': True})
+        print("Variables intitialized in %0.2f min" % ((time() - t0) / 60))
         if FLAGS.test:
             model.load(sess)
             # file_writer = tf.summary.FileWriter('data/logs', sess.graph)
@@ -89,8 +90,11 @@ def main(_):
             if FLAGS.load:
                 t0 = time()
                 model.load(sess)
-                print("Model loaded in %0.2f min" % ((time() - t0) / 60)
+                print("Model loaded in %0.2f min" % ((time() - t0) / 60))
+            print("Building graph summary ...")
+            t0 = time()
             file_writer = tf.summary.FileWriter('data/logs', sess.graph)
+            print("Graph summary built in %0.2f min" % ((time() - t0) / 60))
             print("Training ...")
             model.train(sess, train, val)
 
